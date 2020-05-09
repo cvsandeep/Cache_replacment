@@ -589,6 +589,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
     }
     break;
+  case ARC:  
   default:
     panic("bogus replacement policy");
   }
