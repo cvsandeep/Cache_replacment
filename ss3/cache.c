@@ -139,6 +139,14 @@
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
 
+
+/* Declaring buffers for ARC policy */
+int BufferL1 [nsets * assoc];	// Buffer L1
+int BufferL2 [nsets * assoc];	// Buffer L2
+
+/* Declaring a global "p" and initializing it to 0 */
+int p = 0;
+
 /* unlink BLK from the hash table bucket chain in SET */
 static void
 unlink_htab_ent(struct cache_t *cp,		/* cache to update */
