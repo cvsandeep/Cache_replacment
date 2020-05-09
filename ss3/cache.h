@@ -162,6 +162,7 @@ struct cache_t
   unsigned int RRPV_width;	/* width of ReReference Prediction Value register */
   int *BufferL1;	// Buffer L1
   int *BufferL2;	// Buffer L2
+  int p;   // p initialized to 0, deciedes the number of elements to pick from L1 and L2
   enum cache_policy policy;	/* cache replacement policy */
   unsigned int hit_latency;	/* cache hit latency */
 
