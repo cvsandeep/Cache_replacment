@@ -134,6 +134,7 @@ struct cache_blk_t
      defined in this structure! */
   byte_t data[1];		/* actual data block starts here, block size
 				   should probably be a multiple of 8 */
+  unsigned int RRPV;	/* ReReference Prediction Value */
 };
 
 /* cache set definition (one or more blocks sharing the same set index) */
@@ -158,6 +159,7 @@ struct cache_t
   int balloc;			/* maintain cache contents? */
   int usize;			/* user allocated data size */
   int assoc;			/* cache associativity */
+  unsigned int RRPV_width;	/* width of ReReference Prediction Value register */
   enum cache_policy policy;	/* cache replacement policy */
   unsigned int hit_latency;	/* cache hit latency */
 

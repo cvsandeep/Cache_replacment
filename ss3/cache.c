@@ -319,6 +319,9 @@ cache_create(char *name,		/* name of the cache */
   cp->policy = policy;
   cp->hit_latency = hit_latency;
 
+  /* Intialize RRIP*/  
+  cp->RRPV_width = 3;
+
   /* miss/replacement functions */
   cp->blk_access_fn = blk_access_fn;
 
@@ -391,6 +394,9 @@ cache_create(char *name,		/* name of the cache */
 	  blk->ready = 0;
 	  blk->user_data = (usize != 0
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
+
+    /* Intailiaze RRPV with the max value */
+	  blk->RRPV = (1 << (cp->RRPV_width)) - 1;
 
 	  /* insert cache block into set hash table */
 	  if (cp->hsize)
@@ -597,7 +603,10 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
     }
     break;
-  case ARC:  
+  case ARC:    /* TOdo for ARC Misses */
+  case BRRIP:  /* TOdo for BRRIP Misses */
+  case SRRIP:  /* TOdo for SRRIP Misses */
+  case DRRIP:  /* TOdo for DRRIP Misses */
   default:
     panic("bogus replacement policy");
   }
