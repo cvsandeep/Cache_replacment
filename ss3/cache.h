@@ -106,7 +106,7 @@ enum cache_policy {
   BRRIP,
   SRRIP,        /*replaces the one with distant re-reference interval*/
   DRRIP,
-  ARC           /*replaces adaptively based on Parameter 'p */                                                  */
+  ARC           /*replaces adaptively based on Parameter 'p' */                                                  
 };
 
 /* block status values */
