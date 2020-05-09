@@ -139,11 +139,6 @@
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
 
-
-/* Declaring buffers for ARC policy */
-int BufferL1 [nsets * assoc];	// Buffer L1
-int BufferL2 [nsets * assoc];	// Buffer L2
-
 /* Declaring a global "p" and initializing it to 0 */
 int p = 0;
 
@@ -321,6 +316,11 @@ cache_create(char *name,		/* name of the cache */
 
   /* Intialize RRIP*/  
   cp->RRPV_width = 3;
+  
+  /* Construct Bufffer arrays for ARC*/
+  cp->BufferL1 = malloc(nsets * assoc);
+  cp->BufferL2 = malloc(nsets * assoc);
+  
 
   /* miss/replacement functions */
   cp->blk_access_fn = blk_access_fn;

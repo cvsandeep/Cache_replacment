@@ -160,6 +160,8 @@ struct cache_t
   int usize;			/* user allocated data size */
   int assoc;			/* cache associativity */
   unsigned int RRPV_width;	/* width of ReReference Prediction Value register */
+  int *BufferL1;	// Buffer L1
+  int *BufferL2;	// Buffer L2
   enum cache_policy policy;	/* cache replacement policy */
   unsigned int hit_latency;	/* cache hit latency */
 
