@@ -409,6 +409,10 @@ cache_char2policy(char c)		/* replacement policy as a char */
   case 'l': return LRU;
   case 'r': return Random;
   case 'f': return FIFO;
+  case 'b': return BRRIP;
+  case 's': return SRRIP;
+  case 'd': return DRRIP;
+  case 'a': return ARC;		  
   default: fatal("bogus replacement policy, `%c'", c);
   }
 }
@@ -427,6 +431,10 @@ cache_config(struct cache_t *cp,	/* cache instance */
 	  cp->policy == LRU ? "LRU"
 	  : cp->policy == Random ? "Random"
 	  : cp->policy == FIFO ? "FIFO"
+	  : cp->policy == BRRIP ? "BRRIP"
+	  : cp->policy == SRRIP ? "SRRIP"
+	  : cp->policy == DRRIP ? "DRRIP"
+	  : cp->policy == ARC ? "ARC"
 	  : (abort(), ""));
 }
 
