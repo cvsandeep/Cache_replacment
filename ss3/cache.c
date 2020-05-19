@@ -535,6 +535,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   md_addr_t bofs = CACHE_BLK(cp, addr);
   struct cache_blk_t *blk, *repl;
   int lat = 0;
+  int max_RRPV = (1 << (cp->RRPV_width)) - 1;
 
   /* default replacement address */
   if (repl_addr)
@@ -604,12 +605,40 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
     }
     break;
-  case ARC:    /* TOdo for ARC Misses */
-  case BRRIP:  /* TOdo for BRRIP Misses */
+  case ARC:   break; /* TOdo for ARC Misses */
+  case BRRIP: break; /* TOdo for BRRIP Misses */
   case SRRIP:  /* TOdo for SRRIP Misses */
-  case DRRIP:  /* TOdo for DRRIP Misses */
+    {
+      int found_victim = 0;
+      while(found_victim == 0) // Iterate until you find the victim cache
+      {
+        for (blk=cp->sets[set].way_head; blk; blk=blk->way_next)
+        {
+          if (blk->RRPV == max_RRPV)
+            {
+              found_victim = 1;
+              // Update repl with the the cache plock which need to evicted 
+              repl = blk ;
+              break;
+            }
+        }
+
+        if (found_victim == 0) //if victim not yet found incremnt RRPV to all blocks in a set
+        {
+          for (blk=cp->sets[set].way_head; blk; blk=blk->way_next)
+          {
+            blk->RRPV++; //Check with max is not added 
+          }
+        }
+
+      } //End while when victim cache is found
+      // Found the victim cahche assinging RRPV max -1
+      repl->RRPV = max_RRPV - 1;
+    }
+    break;
+  case DRRIP: break; /* TOdo for DRRIP Misses */
   default:
-    panic("bogus replacement policy");
+    panic("bogus replacement policy=%d",cp->policy);
   }
 
   /* remove this block from the hash bucket chain, if hash exists */
@@ -702,6 +731,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
       update_way_list(&cp->sets[set], blk, Head);
     }
 
+  if (blk->RRPV && cp->policy == SRRIP) 
+    {
+      //Moving to far location so wont be victim to evict
+      blk->RRPV--;
+    }
+
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
   /* record the last block to hit */
@@ -731,6 +766,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
     blk->status |= CACHE_BLK_DIRTY;
 
   /* this block hit last, no change in the way list */
+
+  if (cp->policy == SRRIP) 
+    {
+      /* This block is used frequently so making it far*/ 
+      blk->RRPV=0;
+    }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
