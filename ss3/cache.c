@@ -139,9 +139,6 @@
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
 
-/* Declaring a global "p" and initializing it to 0 */
-int p = 0;
-
 /* unlink BLK from the hash table bucket chain in SET */
 static void
 unlink_htab_ent(struct cache_t *cp,		/* cache to update */
@@ -317,6 +314,9 @@ cache_create(char *name,		/* name of the cache */
 
   /* Intialize RRIP*/  
   cp->RRPV_width = rrpv_width;
+  
+  /* Initialize p*/
+  cp->p = 0;
   
   /* Construct Bufffer arrays for ARC*/
   cp->BufferL1 = malloc(nsets * assoc);
