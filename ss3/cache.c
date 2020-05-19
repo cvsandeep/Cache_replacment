@@ -267,6 +267,7 @@ cache_create(char *name,		/* name of the cache */
 	     int balloc,		/* allocate data space for blocks? */
 	     int usize,			/* size of user data to alloc w/blks */
 	     int assoc,			/* associativity of cache */
+       unsigned int rrpv_width,	/* width of Re-Reference Prediction Value register */
 	     enum cache_policy policy,	/* replacement policy w/in sets */
 	     /* block access function, see description w/in struct cache def */
 	     unsigned int (*blk_access_fn)(enum mem_cmd cmd,
@@ -315,7 +316,7 @@ cache_create(char *name,		/* name of the cache */
   cp->hit_latency = hit_latency;
 
   /* Intialize RRIP*/  
-  cp->RRPV_width = 3;
+  cp->RRPV_width = rrpv_width;
   
   /* Construct Bufffer arrays for ARC*/
   cp->BufferL1 = malloc(nsets * assoc);
