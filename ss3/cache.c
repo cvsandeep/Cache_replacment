@@ -397,7 +397,11 @@ cache_create(char *name,		/* name of the cache */
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
 
     /* Intailiaze RRPV with the max value */
-	  blk->RRPV = (1 << (cp->RRPV_width)) - 1;
+    int max_RRPV = (1 << (cp->RRPV_width)) - 1;
+    if(cp->policy == BRRIP)
+	    blk->RRPV = max_RRPV ;
+    else if(cp->policy == SRRIP)
+      blk->RRPV = max_RRPV - 1;
 
 	  /* insert cache block into set hash table */
 	  if (cp->hsize)
@@ -514,6 +518,27 @@ cache_stats(struct cache_t *cp,		/* cache instance */
 	  (double)cp->invalidations/sum);
 }
 
+/* select a victim cache with saturated counter RRPV */
+struct cache_blk_t *rrip_victim_selection(struct cache_set_t *set, int max_RRPV)
+{
+	struct cache_blk_t* blk;
+	while(1){
+		for (blk = set->way_head; blk; blk = blk->way_next){
+			/* search for first max_RRPV from left */
+			if (blk->RRPV == max_RRPV){
+				/* first max_RRPV found, set RRPV as 2 for the incoming introduced block */
+				return blk;
+			}
+		}
+    
+    // No max_RRPV found, 
+		for (blk = set->way_head; blk; blk = blk->way_next){
+			// increment all RRPVs
+			blk->RRPV++;
+		}
+	}
+}
+
 /* access a cache, perform a CMD operation on cache CP at address ADDR,
    places NBYTES of data at *P, returns latency of operation if initiated
    at NOW, places pointer to block user data in *UDATA, *P is untouched if
@@ -606,32 +631,16 @@ cache_access(struct cache_t *cp,	/* cache to access */
     }
     break;
   case ARC:   break; /* TOdo for ARC Misses */
-  case BRRIP: break; /* TOdo for BRRIP Misses */
+  case BRRIP: /* TOdo for BRRIP Misses */
+    {
+      repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
+      // Found the victim cahche assinging RRPV max -1
+      repl->RRPV = max_RRPV;
+    }
+    break;
   case SRRIP:  /* TOdo for SRRIP Misses */
     {
-      int found_victim = 0;
-      while(found_victim == 0) // Iterate until you find the victim cache
-      {
-        for (blk=cp->sets[set].way_head; blk; blk=blk->way_next)
-        {
-          if (blk->RRPV == max_RRPV)
-            {
-              found_victim = 1;
-              // Update repl with the the cache plock which need to evicted 
-              repl = blk ;
-              break;
-            }
-        }
-
-        if (found_victim == 0) //if victim not yet found incremnt RRPV to all blocks in a set
-        {
-          for (blk=cp->sets[set].way_head; blk; blk=blk->way_next)
-          {
-            blk->RRPV++; //Check with max is not added 
-          }
-        }
-
-      } //End while when victim cache is found
+      repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
       // Found the victim cahche assinging RRPV max -1
       repl->RRPV = max_RRPV - 1;
     }
