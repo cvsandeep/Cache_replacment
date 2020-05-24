@@ -113,6 +113,9 @@ enum cache_policy {
 #define CACHE_BLK_VALID		0x00000001	/* block in valid, in use */
 #define CACHE_BLK_DIRTY		0x00000002	/* dirty block */
 
+//DRRIP Defines
+#define setDuelMax        15
+
 /* cache block (or line) definition */
 struct cache_blk_t
 {
@@ -147,6 +150,7 @@ struct cache_set_t
   struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
 				   this pointer can also be used for random
 				   access to cache blocks */
+  unsigned int setDuelingType;		// Track the leader sets to use BRRIP or SRRIP
 };
 
 /* cache definition */

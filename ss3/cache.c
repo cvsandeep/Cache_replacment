@@ -399,9 +399,16 @@ cache_create(char *name,		/* name of the cache */
     /* Intailiaze RRPV with the max value */
     int max_RRPV = (1 << (cp->RRPV_width)) - 1;
     if(cp->policy == BRRIP)
-	    blk->RRPV = max_RRPV ;
+	    blk->RRPV = max_RRPV ; //Use j for 95% max
     else if(cp->policy == SRRIP)
       blk->RRPV = max_RRPV - 1;
+    else if (cp->policy == DRRIP) 
+    {
+        cp->sets[i].setDuelingType = (i%2)*setDuelMax; 
+        //cp->sets[i].setDuelingType = setDuelMax; 
+        blk->RRPV = max_RRPV - (i%2);
+        //blk->RRPV = max_RRPV - 1;
+    }
 
 	  /* insert cache block into set hash table */
 	  if (cp->hsize)
@@ -645,7 +652,20 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl->RRPV = max_RRPV - 1;
     }
     break;
-  case DRRIP: break; /* TOdo for DRRIP Misses */
+  case DRRIP:  /* TOdo for DRRIP Misses */
+    {
+      repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
+      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP decrement
+      {
+        repl->RRPV = max_RRPV;
+        cp->sets[set].setDuelingType++;
+      } else   //SRRIP increment
+      {
+        repl->RRPV = max_RRPV - 1;
+        cp->sets[set].setDuelingType--;
+      } 
+    }
+    break;
   default:
     panic("bogus replacement policy=%d",cp->policy);
   }
@@ -745,7 +765,25 @@ cache_access(struct cache_t *cp,	/* cache to access */
       //Moving to far location so wont be victim to evict
       blk->RRPV--;
     }
-
+  else if (blk->RRPV && cp->policy == BRRIP) 
+    {
+      //Moving to far location so wont be victim to evict
+      blk->RRPV--;
+    }
+  else if (cp->policy == DRRIP)
+    {
+      if(blk->RRPV)
+        blk->RRPV--;
+      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP
+      {
+        if( cp->sets[set].setDuelingType > 0)
+          cp->sets[set].setDuelingType--;
+      } else   //SRRIP
+      {
+        if(cp->sets[set].setDuelingType < setDuelMax)
+        cp->sets[set].setDuelingType++;
+      } 
+    }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
   /* record the last block to hit */
@@ -776,12 +814,24 @@ cache_access(struct cache_t *cp,	/* cache to access */
 
   /* this block hit last, no change in the way list */
 
-  if (cp->policy == SRRIP) 
+  if (blk->RRPV) 
     {
       /* This block is used frequently so making it far*/ 
       blk->RRPV=0;
     }
 
+  if (cp->policy == DRRIP)
+    {
+      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP
+      {
+        if( cp->sets[set].setDuelingType > 0)
+          cp->sets[set].setDuelingType--;
+      } else   //SRRIP
+      {
+        if(cp->sets[set].setDuelingType < setDuelMax)
+        cp->sets[set].setDuelingType++;
+      } 
+    }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
   /* get user block data, if requested and it exists */
