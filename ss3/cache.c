@@ -416,14 +416,14 @@ cache_create(char *name,		/* name of the cache */
       blk->RRPV = max_RRPV - 1;
     else if (cp->policy == DRRIP) 
     {
-      if ( i % (nsets/32) == 0 ) // Assign some sets to BRRIP
+      if ( (i+1) % ((nsets/32)-1) ==  0) // Assign some sets to BRRIP
       {
         cp->sets[i].setDuelingType = BRRIP; 
         if (rand()%1000 < BIOMODAL_PERCT)
           blk->RRPV = max_RRPV;
         else
           blk->RRPV = max_RRPV -1;
-      } else if ( (i+1) % (nsets/32) == 0 ) // Assign some sets to SRRIP
+      } else if ( i % ((nsets/32)+1) == 0 )  // Assign some sets to SRRIP
       {
         cp->sets[i].setDuelingType = SRRIP; 
         blk->RRPV = max_RRPV - 1;
@@ -682,6 +682,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
       if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP 
       {
+        if(cp->policy_selector)
+          cp->policy_selector--;
         if (rand()%1000 < BIOMODAL_PERCT)
           repl->RRPV = max_RRPV-1;
         else
@@ -690,6 +692,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
       else if(cp->sets[set].setDuelingType == SRRIP)  //SRRIP 
       {
         repl->RRPV = max_RRPV - 1;
+        if( cp->policy_selector < policySelMax)
+          cp->policy_selector++;
       }
       else 
       {
@@ -812,7 +816,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       blk->RRPV--;
     }
 
-  if (cp->policy == DRRIP)
+  if (cp->policy == "skip") //Skipping during hit for now
     {
       if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
@@ -860,7 +864,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       blk->RRPV=0;
     }
 
-  if (cp->policy == DRRIP)
+  if (cp->policy == "skip") //Skipping during hit for now
     {
       if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
