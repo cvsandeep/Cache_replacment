@@ -114,7 +114,8 @@ enum cache_policy {
 #define CACHE_BLK_DIRTY		0x00000002	/* dirty block */
 
 //DRRIP Defines
-#define setDuelMax        15
+#define policySelMax      15
+#define BIOMODAL_PERCT    50 /* 5% of time assign RRPV to 2 */
 
 /* cache block (or line) definition */
 struct cache_blk_t
@@ -164,6 +165,7 @@ struct cache_t
   int usize;			/* user allocated data size */
   int assoc;			/* cache associativity */
   unsigned int RRPV_width;	/* width of ReReference Prediction Value register */
+  unsigned int policy_selector;
   int *BufferL1;	// Buffer L1
   int *BufferL2;	// Buffer L2
   int p;   // p initialized to 0, deciedes the number of elements to pick from L1 and L2

@@ -311,6 +311,7 @@ cache_create(char *name,		/* name of the cache */
   cp->assoc = assoc;
   cp->policy = policy;
   cp->hit_latency = hit_latency;
+  cp->policy_selector = 0;
 
   /* Intialize RRIP*/  
   cp->RRPV_width = rrpv_width;
@@ -370,6 +371,12 @@ cache_create(char *name,		/* name of the cache */
       /* get a hash table, if needed */
       if (cp->hsize)
 	{
+ 
+   if (cp->policy == DRRIP) 
+    {
+      cp->sets[i].setDuelingType = DRRIP; 
+    }
+
 	  cp->sets[i].hash =
 	    (struct cache_blk_t **)calloc(cp->hsize,
 					  sizeof(struct cache_blk_t *));
@@ -399,17 +406,32 @@ cache_create(char *name,		/* name of the cache */
     /* Intailiaze RRPV with the max value */
     int max_RRPV = (1 << (cp->RRPV_width)) - 1;
     if(cp->policy == BRRIP)
-	    blk->RRPV = max_RRPV ; //Use j for 95% max
+    {
+	    if (rand()%1000 < BIOMODAL_PERCT)
+        blk->RRPV = max_RRPV;
+      else
+        blk->RRPV = max_RRPV -1;
+    }
     else if(cp->policy == SRRIP)
       blk->RRPV = max_RRPV - 1;
     else if (cp->policy == DRRIP) 
     {
-        cp->sets[i].setDuelingType = (i%2)*setDuelMax; 
-        //cp->sets[i].setDuelingType = setDuelMax; 
-        blk->RRPV = max_RRPV - (i%2);
-        //blk->RRPV = max_RRPV - 1;
+      if ( i % (nsets/32) == 0 ) // Assign some sets to BRRIP
+      {
+        cp->sets[i].setDuelingType = BRRIP; 
+        if (rand()%1000 < BIOMODAL_PERCT)
+          blk->RRPV = max_RRPV;
+        else
+          blk->RRPV = max_RRPV -1;
+      } else if ( (i+1) % (nsets/32) == 0 ) // Assign some sets to SRRIP
+      {
+        cp->sets[i].setDuelingType = SRRIP; 
+        blk->RRPV = max_RRPV - 1;
+      } else {              // Assign remaining sets to DRRIP
+        cp->sets[i].setDuelingType = DRRIP; 
+        blk->RRPV = max_RRPV - 1;
+      }
     }
-
 	  /* insert cache block into set hash table */
 	  if (cp->hsize)
 	    link_htab_ent(cp, &cp->sets[i], blk);
@@ -642,7 +664,10 @@ cache_access(struct cache_t *cp,	/* cache to access */
     {
       repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
       // Found the victim cahche assinging RRPV max -1
-      repl->RRPV = max_RRPV;
+      if (rand()%1000 < BIOMODAL_PERCT)
+        repl->RRPV = max_RRPV;
+      else
+        repl->RRPV = max_RRPV -1;
     }
     break;
   case SRRIP:  /* TOdo for SRRIP Misses */
@@ -655,15 +680,36 @@ cache_access(struct cache_t *cp,	/* cache to access */
   case DRRIP:  /* TOdo for DRRIP Misses */
     {
       repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
-      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP decrement
+      if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP 
       {
-        repl->RRPV = max_RRPV;
-        cp->sets[set].setDuelingType++;
-      } else   //SRRIP increment
+        if (rand()%1000 < BIOMODAL_PERCT)
+          repl->RRPV = max_RRPV-1;
+        else
+          repl->RRPV = max_RRPV;
+      } 
+      else if(cp->sets[set].setDuelingType == SRRIP)  //SRRIP 
       {
         repl->RRPV = max_RRPV - 1;
-        cp->sets[set].setDuelingType--;
-      } 
+      }
+      else 
+      {
+        //Policy selector high shows high misses in SRRIP so we choose
+    		//BRRIP
+    		if (cp->policy_selector > policySelMax/2)
+    		{
+           //Update RRPV for BRRIP
+    			if (rand()%1000 < BIOMODAL_PERCT)
+    				repl->RRPV = max_RRPV -1;
+    			else
+    				repl->RRPV = max_RRPV;
+    		}
+    		//SRRIP
+    		else
+    		{
+          //Update RRPV for SRRIP
+    			repl->RRPV = max_RRPV-1;	
+    		}
+      }
     }
     break;
   default:
@@ -760,29 +806,23 @@ cache_access(struct cache_t *cp,	/* cache to access */
       update_way_list(&cp->sets[set], blk, Head);
     }
 
-  if (blk->RRPV && cp->policy == SRRIP) 
+  if (blk->RRPV) 
     {
       //Moving to far location so wont be victim to evict
       blk->RRPV--;
     }
-  else if (blk->RRPV && cp->policy == BRRIP) 
+
+  if (cp->policy == DRRIP)
     {
-      //Moving to far location so wont be victim to evict
-      blk->RRPV--;
-    }
-  else if (cp->policy == DRRIP)
-    {
-      if(blk->RRPV)
-        blk->RRPV--;
-      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP
+      if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
-        if( cp->sets[set].setDuelingType > 0)
-          cp->sets[set].setDuelingType--;
-      } else   //SRRIP
+        if(cp->policy_selector)
+          cp->policy_selector--;
+      } else if(cp->sets[set].setDuelingType == SRRIP)  //SRRIP increment
       {
-        if(cp->sets[set].setDuelingType < setDuelMax)
-        cp->sets[set].setDuelingType++;
-      } 
+        if(cp->policy_selector < policySelMax)
+          cp->policy_selector++;
+      }
     }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
@@ -822,15 +862,15 @@ cache_access(struct cache_t *cp,	/* cache to access */
 
   if (cp->policy == DRRIP)
     {
-      if(cp->sets[set].setDuelingType < setDuelMax/2)  // BRRIP
+      if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
-        if( cp->sets[set].setDuelingType > 0)
-          cp->sets[set].setDuelingType--;
-      } else   //SRRIP
+        if(cp->policy_selector)
+          cp->policy_selector--;
+      } else if(cp->sets[set].setDuelingType == SRRIP)  //SRRIP increment
       {
-        if(cp->sets[set].setDuelingType < setDuelMax)
-        cp->sets[set].setDuelingType++;
-      } 
+        if(cp->policy_selector < policySelMax)
+          cp->policy_selector++;
+      }
     }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
