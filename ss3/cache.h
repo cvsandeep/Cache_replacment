@@ -114,7 +114,7 @@ enum cache_policy {
 #define CACHE_BLK_DIRTY		0x00000002	/* dirty block */
 
 //DRRIP Defines
-#define policySelMax      15
+#define policySelMax      1023
 #define BIOMODAL_PERCT    50 /* 5% of time assign RRPV to 2 */
 
 /* cache block (or line) definition */
@@ -152,6 +152,9 @@ struct cache_set_t
 				   this pointer can also be used for random
 				   access to cache blocks */
   unsigned int setDuelingType;		// Track the leader sets to use BRRIP or SRRIP
+  int *BufferB1;	// Buffer B1
+  int *BufferB2;	// Buffer B2
+  int p;   // p initialized to 0, deciedes the number of elements to pick from L1 and L2
 };
 
 /* cache definition */
@@ -166,9 +169,6 @@ struct cache_t
   int assoc;			/* cache associativity */
   unsigned int RRPV_width;	/* width of ReReference Prediction Value register */
   unsigned int policy_selector;
-  int *BufferL1;	// Buffer L1
-  int *BufferL2;	// Buffer L2
-  int p;   // p initialized to 0, deciedes the number of elements to pick from L1 and L2
   enum cache_policy policy;	/* cache replacement policy */
   unsigned int hit_latency;	/* cache hit latency */
 

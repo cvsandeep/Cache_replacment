@@ -316,14 +316,6 @@ cache_create(char *name,		/* name of the cache */
   /* Intialize RRIP*/  
   cp->RRPV_width = rrpv_width;
   
-  /* Initialize p*/
-  cp->p = 0;
-  
-  /* Construct Bufffer arrays for ARC*/
-  cp->BufferL1 = malloc(nsets * assoc);
-  cp->BufferL2 = malloc(nsets * assoc);
-  
-
   /* miss/replacement functions */
   cp->blk_access_fn = blk_access_fn;
 
@@ -369,6 +361,14 @@ cache_create(char *name,		/* name of the cache */
       cp->sets[i].way_head = NULL;
       cp->sets[i].way_tail = NULL;
       /* get a hash table, if needed */
+  if (cp->policy == ARC) {    
+      /* Initialize p*/
+     cp->sets[i].p = 0;
+  
+    /* Construct Bufffer arrays for ARC*/
+    cp->sets[i].BufferB1 = malloc(assoc * sizeof(int));
+    cp->sets[i].BufferB2 = malloc(assoc * sizeof(int));
+  }
       if (cp->hsize)
 	{
  
@@ -659,7 +659,14 @@ cache_access(struct cache_t *cp,	/* cache to access */
       repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
     }
     break;
-  case ARC:   break; /* TOdo for ARC Misses */
+  case ARC:    /* TOdo for ARC Misses */
+    //Update repl =  which block needs to be removed 
+    // for (blk = set->way_head; blk; blk = blk->way_next)
+    // cp->sets[set].p  cp->sets[set].BufferB1[0]
+    //Case 2
+    //Case 3
+    //Case 4
+    break;
   case BRRIP: /* TOdo for BRRIP Misses */
     {
       repl = rrip_victim_selection(&cp->sets[set],max_RRPV);
@@ -828,6 +835,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
           cp->policy_selector++;
       }
     }
+    
+    
+   if (cp->policy == "ARC")
+   {
+     //Case 1
+   }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
   /* record the last block to hit */
@@ -876,6 +889,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
           cp->policy_selector++;
       }
     }
+  
+   if (cp->policy == "ARC")
+   {
+     //Verify it should be in T2 and move it to MRU
+   }
+
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
   /* get user block data, if requested and it exists */
