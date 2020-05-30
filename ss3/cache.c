@@ -663,9 +663,39 @@ cache_access(struct cache_t *cp,	/* cache to access */
     //Update repl =  which block needs to be removed 
     // for (blk = set->way_head; blk; blk = blk->way_next)
     // cp->sets[set].p  cp->sets[set].BufferB1[0]
-    //Case 2
-    //Case 3
-    //Case 4
+    int no_blocks=0;
+    for (blk = set->way_head; blk; blk = blk->way_next){
+      no_blocks++;
+    }
+    // size of T1 is p
+    // Size of T2 is (assoc - no_blocks - p)
+    
+    
+    
+    //Case 2 & 3
+      //If in B2 
+         cp->sets[set].p--;
+         repl = cp->sets[set].way_tail; // in T1
+        //UPdate Evicted one to MRU in B1
+      //if in B1
+         cp->sets[set].p++;
+         if(cp->sets[set].p) // & If in B2
+          //repl = LRU block in T2 is (asoc - p)
+          //Update  Evicted one to MRU in B2
+        
+      if (blk->way_prev)  
+        update_way_list(&cp->sets[set], repl, Head);
+      
+    //Case 4 - miss in T1 & T2 & B1 and B2
+    // Evict in T1 if all the cache blocks are full.
+    if( no_blocks < assoc) {
+        // Insert an element MRU of T1
+        update_way_list(&cp->sets[set], repl, cp->sets[set].p);
+        cp->sets[set].p++;
+    } else {
+        repl = cp->sets[set].way_tail; // in T1
+        //UPdate evicting B1 to LRU
+    }
     break;
   case BRRIP: /* TOdo for BRRIP Misses */
     {
@@ -840,6 +870,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
    if (cp->policy == "ARC")
    {
      //Case 1
+     if (blk->way_prev)
+    {
+      /* move this block to head of the way (MRU) list */
+      update_way_list(&cp->sets[set], blk, Head);
+      // What will be p?
+    }
    }
   /* tag is unchanged, so hash links (if they exist) are still valid */
 
