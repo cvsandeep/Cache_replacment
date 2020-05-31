@@ -186,7 +186,7 @@ link_htab_ent(struct cache_t *cp,		/* cache to update */
 }
 
 /* where to insert a block onto the ordered way chain */
-enum list_loc_t { Head, Tail };
+enum list_loc_t { Head, Tail, T1_Head };
 
 /* insert BLK into the order way chain in SET at location WHERE */
 static void
@@ -364,7 +364,8 @@ cache_create(char *name,		/* name of the cache */
   if (cp->policy == ARC) {    
       /* Initialize p*/
      cp->sets[i].p = 0;
-  
+     cp->sets[i].T1_size = 0;
+     cp->sets[i].T2_size = 0;
     /* Construct Bufffer arrays for ARC*/
     cp->sets[i].BufferB1 = malloc(assoc * sizeof(int));
     cp->sets[i].BufferB2 = malloc(assoc * sizeof(int));
@@ -567,6 +568,35 @@ struct cache_blk_t *rrip_victim_selection(struct cache_set_t *set, int max_RRPV)
 		}
 	}
 }
+struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int in_b2)
+{
+    if (set->T1_size != 0 &&                       // |t1| is not empty
+     (set->T1_size > set->p ||                 // |t1| exceeds target p
+       (in_b2 && // x_t is in b2
+          set->T1_size == set->p))) {          // |t1| = p
+       if(in_b1 || in_b2) {
+         set->T2_size++;
+         set->T1_size--;
+       }
+       // Evict LRU in t1
+       return set->way_tail;
+       
+     } else {
+       if(!in_b1 && !in_b2) {
+         set->T2_size--;
+         set->T1_size++;
+       }
+       // Evict LRU in T2
+       return set->way_tail;
+     }
+}
+
+#define min(a,b) ((a < b)? a : b)
+#define max(a,b) ((a > b)? a : b)
+
+#define delta1(b1,b2) ((b1 >= b2) ? 1 : b2/(double)b1)
+#define delta2(b1,b2) ((b2 >= b1) ? 1 : b1/(double)b2)
+
 
 /* access a cache, perform a CMD operation on cache CP at address ADDR,
    places NBYTES of data at *P, returns latency of operation if initiated
@@ -661,40 +691,45 @@ cache_access(struct cache_t *cp,	/* cache to access */
     break;
   case ARC:    /* TOdo for ARC Misses */
     //Update repl =  which block needs to be removed 
-    // for (blk = set->way_head; blk; blk = blk->way_next)
-    // cp->sets[set].p  cp->sets[set].BufferB1[0]
-    int no_blocks=0;
-    for (blk = set->way_head; blk; blk = blk->way_next){
-      no_blocks++;
-    }
-    // size of T1 is p
-    // Size of T2 is (assoc - no_blocks - p)
-    
-    
-    
-    //Case 2 & 3
-      //If in B2 
-         cp->sets[set].p--;
-         repl = cp->sets[set].way_tail; // in T1
-        //UPdate Evicted one to MRU in B1
-      //if in B1
-         cp->sets[set].p++;
-         if(cp->sets[set].p) // & If in B2
-          //repl = LRU block in T2 is (asoc - p)
-          //Update  Evicted one to MRU in B2
-        
-      if (blk->way_prev)  
-        update_way_list(&cp->sets[set], repl, Head);
+    //Iterate  for (blk = set->way_head; blk; blk = blk->way_next)
+    //Pointer  cp->sets[set].p  cp->sets[set].BufferB1[0]
+   {
+      int in_b1 = 1, in_b2 = 1;
+      int size_b1 = 0, size_b2 = 0;
       
-    //Case 4 - miss in T1 & T2 & B1 and B2
-    // Evict in T1 if all the cache blocks are full.
-    if( no_blocks < assoc) {
-        // Insert an element MRU of T1
-        update_way_list(&cp->sets[set], repl, cp->sets[set].p);
-        cp->sets[set].p++;
-    } else {
-        repl = cp->sets[set].way_tail; // in T1
-        //UPdate evicting B1 to LRU
+      if(in_b1) { //Case 2
+        cp->sets[set].p = min( (cp->sets[set].p + delta1(size_b1,size_b2) ), cp->assoc);
+        //Replace
+        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+        update_way_list(&cp->sets[set], repl, Head);
+      } else if(in_b2) { //Case 3
+        cp->sets[set].p = max( (cp->sets[set].p - delta2(size_b1,size_b2) ), 0);
+        //Replace
+        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+        update_way_list(&cp->sets[set], repl, Head);
+      } else {  //Case 4 - miss in T1 & T2 & B1 and B2
+        if (cp->sets[set].T1_size + size_b1 == cp->assoc) { //Case A
+            if (cp->sets[set].T1_size < cp->assoc) {
+              //Delete LRU in B1
+              //Replace
+              repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+            } else {
+              //Delete LRU in T1
+              repl = cp->sets[set].way_tail;
+            }
+        } else { //Case B
+            int len = cp->sets[set].T1_size + cp->sets[set].T1_size + size_b1+ size_b2;
+          if (len >= cp->assoc) {
+            if (len == 2*cp->assoc) { 
+              //Delete LRU page in B2 
+            }
+            //Replace
+            repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+          }
+        }
+        update_way_list(&cp->sets[set], repl, T1_Head);
+      }
+    
     }
     break;
   case BRRIP: /* TOdo for BRRIP Misses */
@@ -853,7 +888,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       blk->RRPV--;
     }
 
-  if (cp->policy == "skip") //Skipping during hit for now
+  if (cp->policy == 0) //Skipping during hit for now
     {
       if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
@@ -867,14 +902,18 @@ cache_access(struct cache_t *cp,	/* cache to access */
     }
     
     
-   if (cp->policy == "ARC")
+   if (cp->policy == ARC)
    {
      //Case 1
      if (blk->way_prev)
     {
       /* move this block to head of the way (MRU) list */
       update_way_list(&cp->sets[set], blk, Head);
-      // What will be p?
+      int blk_pos = 1; // Write a function to get blk position
+      if(blk_pos <= cp->sets[set].T1_size) {
+        cp->sets[set].T2_size++;
+        cp->sets[set].T1_size--;
+      }
     }
    }
   /* tag is unchanged, so hash links (if they exist) are still valid */
@@ -913,7 +952,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       blk->RRPV=0;
     }
 
-  if (cp->policy == "skip") //Skipping during hit for now
+  if (cp->policy == 0) //Skipping during hit for now
     {
       if(cp->sets[set].setDuelingType == BRRIP)  // BRRIP decrement
       {
@@ -926,9 +965,20 @@ cache_access(struct cache_t *cp,	/* cache to access */
       }
     }
   
-   if (cp->policy == "ARC")
+   if (cp->policy == ARC)
    {
      //Verify it should be in T2 and move it to MRU
+     //Case 1
+     if (blk->way_prev)
+     {
+        /* move this block to head of the way (MRU) list */
+        update_way_list(&cp->sets[set], blk, Head);
+        int blk_pos = 1; // Write a function to get blk position
+        if(blk_pos <= cp->sets[set].T1_size) {
+          cp->sets[set].T2_size++;
+          cp->sets[set].T1_size--;
+        }
+      }
    }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */

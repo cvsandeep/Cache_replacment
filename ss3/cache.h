@@ -154,6 +154,8 @@ struct cache_set_t
   unsigned int setDuelingType;		// Track the leader sets to use BRRIP or SRRIP
   int *BufferB1;	// Buffer B1
   int *BufferB2;	// Buffer B2
+  int T1_size;
+  int T2_size;
   int p;   // p initialized to 0, deciedes the number of elements to pick from L1 and L2
 };
 
