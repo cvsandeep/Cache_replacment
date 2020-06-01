@@ -244,6 +244,30 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
       set->way_head->way_prev = blk;
       set->way_head = blk;
     }
+  else if (where == T1_Head)
+    {
+      /* link to the T1 head of the way list */
+      // Find Prev_blk next_blk of the blk
+      /*struct cache_blk_t *temp,	/* block to insert */
+      /*
+      temp = set->way_tail;
+      
+      for( int i =1; i<set->T1_size && temp! = set->way_head;; i++)
+      {
+          temp = temp->way_prev;
+      }
+        
+      blk->way_next = temp->way_head;
+      blk->way_prev = temp;
+      
+      if(temp->way_next != NULL)
+      {
+          temp->way_next->way_prev = blk;
+      }
+      /* Connect n-1th node with new node */
+      /*temp->way_next = blk;
+      */
+    }
   else if (where == Tail)
     {
       /* link to the tail of the way list */
@@ -252,6 +276,7 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
       set->way_tail->way_next = blk;
       set->way_tail = blk;
     }
+  
   else
     panic("bogus WHERE designator");
 }
@@ -570,6 +595,11 @@ struct cache_blk_t *rrip_victim_selection(struct cache_set_t *set, int max_RRPV)
 }
 struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int in_b2)
 {
+    struct cache_blk_t* blk;
+    int size_b1 = 0, size_b2 = 0;
+    for (size_b1=0; set->BufferB1[size_b1]; size_b1++);
+    for (size_b2=0; set->BufferB2[size_b2]; size_b2++);
+
     if (set->T1_size != 0 &&                       // |t1| is not empty
      (set->T1_size > set->p ||                 // |t1| exceeds target p
        (in_b2 && // x_t is in b2
@@ -578,16 +608,35 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
          set->T2_size++;
          set->T1_size--;
        }
-       // Evict LRU in t1
+       // Evict LRU in t1 and place in B1
+       for (int j=size_b1; ((j >= 0) && size_b1); j--)
+    	 {
+      	set->BufferB1[j] = set->BufferB1[j-1];
+       }
+       set->BufferB1[0] = set->way_tail->tag;
+
        return set->way_tail;
        
-     } else {
+     } else {  // Evict LRU in T2
        if(!in_b1 && !in_b2) {
          set->T2_size--;
          set->T1_size++;
+         //return;
        }
-       // Evict LRU in T2
-       return set->way_tail;
+       blk = set->way_head;
+       for( int i = 1; i < set->T2_size; i++)
+       {
+           blk = blk->way_next;
+       }
+       
+       for (int j=size_b2; ((j >= 0) && size_b2); j--)
+    	 {
+      	set->BufferB2[j] = set->BufferB2[j-1];
+       }
+       set->BufferB2[0] = blk->tag;
+       
+       return blk;
+      
      }
 }
 
@@ -694,9 +743,23 @@ cache_access(struct cache_t *cp,	/* cache to access */
     //Iterate  for (blk = set->way_head; blk; blk = blk->way_next)
     //Pointer  cp->sets[set].p  cp->sets[set].BufferB1[0]
    {
-      int in_b1 = 1, in_b2 = 1;
+      int in_b1 = 0, in_b2 = 0;
       int size_b1 = 0, size_b2 = 0;
+      for (size_b1=0; cp->sets[set].BufferB1[size_b1]; size_b1++);
+      for (size_b2=0; cp->sets[set].BufferB2[size_b2]; size_b2++);
       
+      for (int i=0; cp->sets[set].BufferB1[i]; i++)
+    	{
+    		if(cp->sets[set].BufferB1[i] == blk->tag)
+    			in_b1 = 1;
+    	}
+      for (int i=0; cp->sets[set].BufferB2[i]; i++)
+    	{
+    		if(cp->sets[set].BufferB2[i] == blk->tag)
+    			in_b2 = 1;
+    	}
+
+    
       if(in_b1) { //Case 2
         cp->sets[set].p = min( (cp->sets[set].p + delta1(size_b1,size_b2) ), cp->assoc);
         //Replace
@@ -711,6 +774,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
         if (cp->sets[set].T1_size + size_b1 == cp->assoc) { //Case A
             if (cp->sets[set].T1_size < cp->assoc) {
               //Delete LRU in B1
+              cp->sets[set].BufferB1[size_b1]=0;
               //Replace
               repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
             } else {
@@ -721,15 +785,19 @@ cache_access(struct cache_t *cp,	/* cache to access */
             int len = cp->sets[set].T1_size + cp->sets[set].T1_size + size_b1+ size_b2;
           if (len >= cp->assoc) {
             if (len == 2*cp->assoc) { 
-              //Delete LRU page in B2 
+              //Delete LRU page in B2
+              cp->sets[set].BufferB1[size_b2]=0; 
             }
             //Replace
             repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
           }
         }
-        update_way_list(&cp->sets[set], repl, T1_Head);
+        //If LRU of T2 needs to be evicted no need to chnage its positions only zize is adjusted
+        //If LRU of T1 needs to be evicted we need to update its position to T1 Head  
+        if(repl)
+          update_way_list(&cp->sets[set], repl, T1_Head);
       }
-    
+
     }
     break;
   case BRRIP: /* TOdo for BRRIP Misses */
@@ -909,7 +977,18 @@ cache_access(struct cache_t *cp,	/* cache to access */
     {
       /* move this block to head of the way (MRU) list */
       update_way_list(&cp->sets[set], blk, Head);
-      int blk_pos = 1; // Write a function to get blk position
+      int blk_pos = 0; // Write a function to get blk position
+      
+      struct cache_blk_t* temp; 
+      temp = cp->sets[set].way_head;
+      while(temp)
+      {
+        if (temp->tag == blk->tag)
+          break;
+        temp=temp->way_next;
+        blk_pos++; 
+      }
+
       if(blk_pos <= cp->sets[set].T1_size) {
         cp->sets[set].T2_size++;
         cp->sets[set].T1_size--;
@@ -973,7 +1052,16 @@ cache_access(struct cache_t *cp,	/* cache to access */
      {
         /* move this block to head of the way (MRU) list */
         update_way_list(&cp->sets[set], blk, Head);
-        int blk_pos = 1; // Write a function to get blk position
+        int blk_pos = 0;
+        struct cache_blk_t* temp = cp->sets[set].way_head;
+        while(temp)
+        {
+          if (temp->tag == blk->tag)
+            break;
+          temp=temp->way_next;
+          blk_pos++; 
+        }
+      
         if(blk_pos <= cp->sets[set].T1_size) {
           cp->sets[set].T2_size++;
           cp->sets[set].T1_size--;
