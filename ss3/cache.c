@@ -248,16 +248,16 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
     {
       /* link to the T1 head of the way list */
       // Find Prev_blk next_blk of the blk
-      /*struct cache_blk_t *temp,	/* block to insert */
-      /*
-      temp = set->way_tail;
+      struct cache_blk_t *temp;	/* block to insert */
       
-      for( int i =1; i<set->T1_size && temp! = set->way_head;; i++)
+      temp = set->way_tail;
+      // Temp points to T1 size location
+      for( int i = 1; ( (i < set->T1_size) && (temp != set->way_head) ); i++)
       {
           temp = temp->way_prev;
       }
-        
-      blk->way_next = temp->way_head;
+           
+      blk->way_next = set->way_head;
       blk->way_prev = temp;
       
       if(temp->way_next != NULL)
@@ -265,8 +265,8 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
           temp->way_next->way_prev = blk;
       }
       /* Connect n-1th node with new node */
-      /*temp->way_next = blk;
-      */
+      temp->way_next = blk;
+      
     }
   else if (where == Tail)
     {
@@ -394,6 +394,7 @@ cache_create(char *name,		/* name of the cache */
     /* Construct Bufffer arrays for ARC*/
     cp->sets[i].BufferB1 = malloc(assoc * sizeof(int));
     cp->sets[i].BufferB2 = malloc(assoc * sizeof(int));
+
   }
       if (cp->hsize)
 	{
@@ -777,9 +778,11 @@ cache_access(struct cache_t *cp,	/* cache to access */
               cp->sets[set].BufferB1[size_b1]=0;
               //Replace
               repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+              update_way_list(&cp->sets[set], repl, T1_Head);
             } else {
               //Delete LRU in T1
               repl = cp->sets[set].way_tail;
+              update_way_list(&cp->sets[set], repl, T1_Head);
             }
         } else { //Case B
             int len = cp->sets[set].T1_size + cp->sets[set].T1_size + size_b1+ size_b2;
@@ -790,12 +793,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
             }
             //Replace
             repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+            update_way_list(&cp->sets[set], repl, T1_Head);
           }
         }
         //If LRU of T2 needs to be evicted no need to chnage its positions only zize is adjusted
         //If LRU of T1 needs to be evicted we need to update its position to T1 Head  
-        if(repl)
-          update_way_list(&cp->sets[set], repl, T1_Head);
+          
       }
 
     }
