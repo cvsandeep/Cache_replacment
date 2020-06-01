@@ -762,17 +762,21 @@ cache_access(struct cache_t *cp,	/* cache to access */
 
     
       if(in_b1) { //Case 2
+        //debug("in_b1");
         cp->sets[set].p = min( (cp->sets[set].p + delta1(size_b1,size_b2) ), cp->assoc);
         //Replace
         repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
         update_way_list(&cp->sets[set], repl, Head);
       } else if(in_b2) { //Case 3
+        //debug("in_b2");
         cp->sets[set].p = max( (cp->sets[set].p - delta2(size_b1,size_b2) ), 0);
         //Replace
         repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
         update_way_list(&cp->sets[set], repl, Head);
       } else {  //Case 4 - miss in T1 & T2 & B1 and B2
+        //debug("not in b1 and b2");
         if (cp->sets[set].T1_size + size_b1 == cp->assoc) { //Case A
+            //debug("in_b1:Case-A");
             if (cp->sets[set].T1_size < cp->assoc) {
               //Delete LRU in B1
               cp->sets[set].BufferB1[size_b1]=0;
@@ -785,14 +789,20 @@ cache_access(struct cache_t *cp,	/* cache to access */
               update_way_list(&cp->sets[set], repl, T1_Head);
             }
         } else { //Case B
+          //debug("in_b1:Case-B");
             int len = cp->sets[set].T1_size + cp->sets[set].T1_size + size_b1+ size_b2;
           if (len >= cp->assoc) {
+            //debug("in_b1:Case-B:Length is high");
             if (len == 2*cp->assoc) { 
               //Delete LRU page in B2
               cp->sets[set].BufferB1[size_b2]=0; 
             }
             //Replace
             repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+            update_way_list(&cp->sets[set], repl, T1_Head);
+          } else {
+            //debug(" Having empty Cache block No need of eviction");
+            repl = cp->sets[set].way_tail;
             update_way_list(&cp->sets[set], repl, T1_Head);
           }
         }
