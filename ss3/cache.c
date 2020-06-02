@@ -1058,7 +1058,7 @@ debug("Done removing block in hash bucket");
   if (blk->RRPV) 
     {
       //Moving to far location so wont be victim to evict
-      blk->RRPV--;
+      blk->RRPV=0;
     }
 
   if (cp->policy == 0) //Skipping during hit for now
@@ -1078,7 +1078,7 @@ debug("Done removing block in hash bucket");
    if (cp->policy == ARC)
    {
      debug("************************ARC:HIT:Tag=%d***********************************",tag);
-     displayCache(&cp->sets[set]);
+     //displayCache(&cp->sets[set]);
      //Case 1
      if (blk->way_prev)
     {
@@ -1154,7 +1154,7 @@ debug("Done removing block in hash bucket");
    if (cp->policy == ARC)
    {
      debug("************************ARC:HIT:Tag=%d***********************************",tag);
-     displayCache(&cp->sets[set]);
+     //displayCache(&cp->sets[set]);
      //Case 1
      if (blk->way_prev)
     {
