@@ -616,12 +616,12 @@ struct cache_blk_t *rrip_victim_selection(struct cache_set_t *set, int max_RRPV)
 		}
 	}
 }
-struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int in_b2)
+struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int in_b2, int c)
 {
     struct cache_blk_t* blk;
     int size_b1 = 0, size_b2 = 0;
-    for (size_b1=0; set->BufferB1[size_b1]; size_b1++);
-    for (size_b2=0; set->BufferB2[size_b2]; size_b2++);
+    for (size_b1=0; set->BufferB1[size_b1] && (size_b1 < c-1); size_b1++);
+    for (size_b2=0; set->BufferB2[size_b2] && (size_b2 < c-1); size_b2++);
     debug("");
     if (set->T1_size != 0 &&                       // |t1| is not empty
      (set->T1_size > set->p ||                 // |t1| exceeds target p
@@ -631,13 +631,15 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
          set->T2_size++;
          set->T1_size--;
        }
+
        // Evict LRU in t1 and place in B1
-       for (int j=size_b1; ((j >= 0) && size_b1); j--)
+       for (int j=size_b1; ((j > 0) && size_b1); j--)
     	 {
       	set->BufferB1[j] = set->BufferB1[j-1];
        }
        set->BufferB1[0] = set->way_tail->tag;
        debug("Placing In B1 %d",set->way_tail->tag);
+       
        return set->way_tail;
        
      } else {  // Evict LRU in T2
@@ -653,11 +655,12 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
          set->T1_size++;
          //return;
        }
-       
-       for (int j=size_b2; ((j >= 0) && size_b2); j--)
+
+       for (int j=size_b2; ((j > 0) && size_b2); j--)
     	 {
-      	set->BufferB2[j] = set->BufferB2[j-1];
+         set->BufferB2[j] = set->BufferB2[j-1];
        }
+
        set->BufferB2[0] = blk->tag;
        debug("Placing In B2 %d",blk->tag);
        
@@ -816,8 +819,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
       displayCache(&cp->sets[set]);
       int in_b1 = 0, in_b2 = 0;
       int size_b1 = 0, size_b2 = 0;
-      for (size_b1=0; cp->sets[set].BufferB1[size_b1]; size_b1++);
-      for (size_b2=0; cp->sets[set].BufferB2[size_b2]; size_b2++);
+      for (size_b1=0; cp->sets[set].BufferB1[size_b1] && (size_b1 < cp->assoc-1); size_b1++);
+      for (size_b2=0; cp->sets[set].BufferB2[size_b2] && (size_b1 < cp->assoc-1); size_b2++);
       
       for (int i=0; cp->sets[set].BufferB1[i]; i++)
     	{
@@ -835,23 +838,23 @@ cache_access(struct cache_t *cp,	/* cache to access */
         debug("in_b1");
         cp->sets[set].p = min( (cp->sets[set].p + delta1(size_b1,size_b2) ), cp->assoc);
         //Replace
-        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2, cp->assoc);
         update_way_list(&cp->sets[set], repl, Head);
       } else if(in_b2) { //Case 3
         debug("in_b2");
         cp->sets[set].p = max( (cp->sets[set].p - delta2(size_b1,size_b2) ), 0);
         //Replace
-        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+        repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2, cp->assoc);
         update_way_list(&cp->sets[set], repl, Head);
       } else {  //Case 4 - miss in T1 & T2 & B1 and B2
         //debug("not in b1 and b2");
         if (cp->sets[set].T1_size + size_b1 == cp->assoc) { //Case A
-            debug("in_b1:Case-A");
+            debug("Case-4:Case-A");
             if (cp->sets[set].T1_size < cp->assoc) {
               //Delete LRU in B1
               cp->sets[set].BufferB1[size_b1]=0;
               //Replace
-              repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+              repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2, cp->assoc);
               //update_way_list(&cp->sets[set], repl, T1_Head);
             } else {
               //Delete LRU in T1
@@ -860,7 +863,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
               //update_way_list(&cp->sets[set], repl, T1_Head);
             }
         } else { //Case B
-          debug("in_b1:Case-B");
+          debug("Case-4:Case-B");
             int len = cp->sets[set].T1_size + cp->sets[set].T2_size + size_b1+ size_b2;
           if (len >= cp->assoc) {
             //debug("in_b1:Case-B:Length is high");
@@ -869,7 +872,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
               cp->sets[set].BufferB1[size_b2]=0; 
             }
             //Replace
-            repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
+            repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2, cp->assoc);
             //update_way_list(&cp->sets[set], repl, T1_Head);
           } else {
             //debug(" Having empty Cache block No need of eviction");
@@ -1079,24 +1082,24 @@ debug("Done removing block in hash bucket");
      //Case 1
      if (blk->way_prev)
     {
-      /* move this block to head of the way (MRU) list */
-      update_way_list(&cp->sets[set], blk, Head);
-      int blk_pos = 0; // Write a function to get blk position
-      
+      int blk_pos = 1;
       struct cache_blk_t* temp; 
       temp = cp->sets[set].way_head;
-      while(temp)
+      
+      while(temp != NULL)
       {
         if (temp->tag == blk->tag)
           break;
         temp=temp->way_next;
         blk_pos++; 
       }
-
-      if(blk_pos <= cp->sets[set].T1_size) {
+      debug("block_position = %d", blk_pos);
+      if(blk_pos > cp->sets[set].T2_size) {
         cp->sets[set].T2_size++;
         cp->sets[set].T1_size--;
       }
+      /* move this block to head of the way (MRU) list */
+      update_way_list(&cp->sets[set], blk, Head);
     }
    }
   /* tag is unchanged, so hash links (if they exist) are still valid */
@@ -1152,27 +1155,29 @@ debug("Done removing block in hash bucket");
    {
      debug("************************ARC:HIT:Tag=%d***********************************",tag);
      displayCache(&cp->sets[set]);
-     //Verify it should be in T2 and move it to MRU
      //Case 1
      if (blk->way_prev)
-     {
-        /* move this block to head of the way (MRU) list */
-        update_way_list(&cp->sets[set], blk, Head);
-        int blk_pos = 0;
-        struct cache_blk_t* temp = cp->sets[set].way_head;
-        while(temp)
-        {
-          if (temp->tag == blk->tag)
-            break;
-          temp=temp->way_next;
-          blk_pos++; 
-        }
+    {
+      int blk_pos = 1;
+      struct cache_blk_t* temp; 
+      temp = cp->sets[set].way_head;
       
-        if(blk_pos <= cp->sets[set].T1_size) {
-          cp->sets[set].T2_size++;
-          cp->sets[set].T1_size--;
-        }
+      while(temp != NULL)
+      {
+        if (temp->tag == blk->tag)
+          break;
+        temp=temp->way_next;
+        blk_pos++; 
       }
+
+      debug("block_position = %d", blk_pos);
+      if(blk_pos > cp->sets[set].T2_size) {
+        cp->sets[set].T2_size++;
+        cp->sets[set].T1_size--;
+      }
+      /* move this block to head of the way (MRU) list */
+      update_way_list(&cp->sets[set], blk, Head);
+    }
    }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
