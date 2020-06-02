@@ -258,16 +258,18 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
       /* link to the T1 head of the way list */
       // Find Prev_blk next_blk of the blk
       struct cache_blk_t *temp;	/* block to insert */
-      
+      int i=0;
       temp = set->way_tail;
+
       // Temp points to T1 size location
-      for( int i = 1; ( (i < set->T1_size) && (temp != set->way_head) ); i++)
+      for( i = 1; ( (i < set->T1_size) && (temp != set->way_head) ); i++)
       {
           temp = temp->way_prev;
       }
       //if temp is at tail position should not proceed
       //New element should be inserted at only MRU not at LRU
-      assert(temp == set->way_tail);
+
+      assert(temp != set->way_tail);
 
       blk->way_next = temp->way_next;
       blk->way_prev = temp;
@@ -612,7 +614,7 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
     int size_b1 = 0, size_b2 = 0;
     for (size_b1=0; set->BufferB1[size_b1]; size_b1++);
     for (size_b2=0; set->BufferB2[size_b2]; size_b2++);
-
+    
     if (set->T1_size != 0 &&                       // |t1| is not empty
      (set->T1_size > set->p ||                 // |t1| exceeds target p
        (in_b2 && // x_t is in b2
@@ -627,7 +629,7 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
       	set->BufferB1[j] = set->BufferB1[j-1];
        }
        set->BufferB1[0] = set->way_tail->tag;
-
+       debug("Placing In B1 %d",set->way_tail->tag);
        return set->way_tail;
        
      } else {  // Evict LRU in T2
@@ -647,10 +649,50 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
       	set->BufferB2[j] = set->BufferB2[j-1];
        }
        set->BufferB2[0] = blk->tag;
+        debug("Placing In B2 %d",blk->tag);
        
        return blk;
       
      }
+}
+
+/**
+ * Display Cache content of the list from beginning to end
+ */
+void displayCache(struct cache_set_t *set)
+{
+    struct cache_blk_t* temp;
+    int n = 1;
+
+    if(set->way_head == NULL)
+    {
+        debug("List is empty.");
+    }
+    else
+    {
+        temp = set->way_head;
+        printf("DATA IN THE LIST:");
+
+        while(temp != NULL)
+        {
+            debug("DATA of %d node = %d", n, temp->tag);
+
+            n++;
+
+            /* Move the current pointer to next node */
+            temp = temp->way_next;
+        }
+    }
+    debug("Size of T1=%d Size of T2=%d", set->T1_size, set->T2_size);
+    int size_b1 = 0, size_b2 = 0;
+    for (size_b1=0; set->BufferB1[size_b1]; size_b1++)
+    {
+      debug("DATA of %d Buffer1 = %d", size_b1, set->BufferB1[size_b1]);
+    }
+    for (size_b2=0; set->BufferB2[size_b2]; size_b2++)
+    {
+      debug("DATA of %d Buffer2 = %d", size_b2, set->BufferB2[size_b2]);
+    }
 }
 
 #define min(a,b) ((a < b)? a : b)
@@ -756,6 +798,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
     //Iterate  for (blk = set->way_head; blk; blk = blk->way_next)
     //Pointer  cp->sets[set].p  cp->sets[set].BufferB1[0]
    {
+      debug("************************Tag=%d***********************************",tag);
+      displayCache(&cp->sets[set]);
       int in_b1 = 0, in_b2 = 0;
       int size_b1 = 0, size_b2 = 0;
       for (size_b1=0; cp->sets[set].BufferB1[size_b1]; size_b1++);
@@ -763,24 +807,24 @@ cache_access(struct cache_t *cp,	/* cache to access */
       
       for (int i=0; cp->sets[set].BufferB1[i]; i++)
     	{
-    		if(cp->sets[set].BufferB1[i] == blk->tag)
+    		if(cp->sets[set].BufferB1[i] == tag)
     			in_b1 = 1;
     	}
       for (int i=0; cp->sets[set].BufferB2[i]; i++)
     	{
-    		if(cp->sets[set].BufferB2[i] == blk->tag)
+    		if(cp->sets[set].BufferB2[i] == tag)
     			in_b2 = 1;
     	}
 
     
       if(in_b1) { //Case 2
-        //debug("in_b1");
+        debug("in_b1");
         cp->sets[set].p = min( (cp->sets[set].p + delta1(size_b1,size_b2) ), cp->assoc);
         //Replace
         repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
         update_way_list(&cp->sets[set], repl, Head);
       } else if(in_b2) { //Case 3
-        //debug("in_b2");
+        debug("in_b2");
         cp->sets[set].p = max( (cp->sets[set].p - delta2(size_b1,size_b2) ), 0);
         //Replace
         repl = arc_victim_selection(&cp->sets[set], in_b1, in_b2);
@@ -788,7 +832,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       } else {  //Case 4 - miss in T1 & T2 & B1 and B2
         //debug("not in b1 and b2");
         if (cp->sets[set].T1_size + size_b1 == cp->assoc) { //Case A
-            //debug("in_b1:Case-A");
+            debug("in_b1:Case-A");
             if (cp->sets[set].T1_size < cp->assoc) {
               //Delete LRU in B1
               cp->sets[set].BufferB1[size_b1]=0;
@@ -801,8 +845,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
               //update_way_list(&cp->sets[set], repl, T1_Head);
             }
         } else { //Case B
-          //debug("in_b1:Case-B");
-            int len = cp->sets[set].T1_size + cp->sets[set].T1_size + size_b1+ size_b2;
+          debug("in_b1:Case-B");
+            int len = cp->sets[set].T1_size + cp->sets[set].T2_size + size_b1+ size_b2;
           if (len >= cp->assoc) {
             //debug("in_b1:Case-B:Length is high");
             if (len == 2*cp->assoc) { 
@@ -815,6 +859,13 @@ cache_access(struct cache_t *cp,	/* cache to access */
           } else {
             //debug(" Having empty Cache block No need of eviction");
             repl = cp->sets[set].way_tail;
+            // Evict LRU in t1 and place in B1
+             for (int j=size_b1; ((j >= 0) && size_b1); j--)
+          	 {
+            	cp->sets[set].BufferB1[j] = cp->sets[set].BufferB1[j-1];
+             }
+             cp->sets[set].BufferB1[0] = cp->sets[set].way_tail->tag;
+             debug("Placing In B1 %d",cp->sets[set].way_tail->tag);
             //update_way_list(&cp->sets[set], repl, T1_Head);
           }
         }
@@ -822,8 +873,9 @@ cache_access(struct cache_t *cp,	/* cache to access */
         //If LRU of T1 needs to be evicted we need to update its position to T1 Head 
         if ( repl == cp->sets[set].way_tail) {
           if(cp->sets[set].T2_size) {
-            if(cp->sets[set].T1_size > 1)
-            update_way_list(&cp->sets[set], repl, T1_Head);
+            if(cp->sets[set].T1_size > 1) {
+              update_way_list(&cp->sets[set], repl, T1_Head);
+            }
           } else {
             update_way_list(&cp->sets[set], repl, Head);  
           }
@@ -892,10 +944,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
     panic("bogus replacement policy=%d",cp->policy);
   }
 
+debug("Done selecting the evict item %d", repl->tag);
+
   /* remove this block from the hash bucket chain, if hash exists */
   if (cp->hsize)
     unlink_htab_ent(cp, &cp->sets[set], repl);
-
+debug("Done removing block in hash bucket");
   /* blow away the last block to hit */
   cp->last_tagset = 0;
   cp->last_blk = NULL;
