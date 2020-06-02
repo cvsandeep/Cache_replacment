@@ -641,15 +641,17 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
        return set->way_tail;
        
      } else {  // Evict LRU in T2
-       if(!in_b1 && !in_b2) {
-         set->T2_size--;
-         set->T1_size++;
-         //return;
-       }
+       
        blk = set->way_head;
        for( int i = 1; i < set->T2_size; i++)
        {
            blk = blk->way_next;
+       }
+       
+       if(!in_b1 && !in_b2) {
+         set->T2_size--;
+         set->T1_size++;
+         //return;
        }
        
        for (int j=size_b2; ((j >= 0) && size_b2); j--)
