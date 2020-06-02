@@ -614,7 +614,7 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
     int size_b1 = 0, size_b2 = 0;
     for (size_b1=0; set->BufferB1[size_b1]; size_b1++);
     for (size_b2=0; set->BufferB2[size_b2]; size_b2++);
-    
+    debug("");
     if (set->T1_size != 0 &&                       // |t1| is not empty
      (set->T1_size > set->p ||                 // |t1| exceeds target p
        (in_b2 && // x_t is in b2
@@ -649,7 +649,7 @@ struct cache_blk_t *arc_victim_selection(struct cache_set_t *set, int in_b1, int
       	set->BufferB2[j] = set->BufferB2[j-1];
        }
        set->BufferB2[0] = blk->tag;
-        debug("Placing In B2 %d",blk->tag);
+       debug("Placing In B2 %d",blk->tag);
        
        return blk;
       
@@ -683,6 +683,7 @@ void displayCache(struct cache_set_t *set)
             temp = temp->way_next;
         }
     }
+    
     debug("Size of T1=%d Size of T2=%d", set->T1_size, set->T2_size);
     int size_b1 = 0, size_b2 = 0;
     for (size_b1=0; set->BufferB1[size_b1]; size_b1++)
@@ -693,6 +694,7 @@ void displayCache(struct cache_set_t *set)
     {
       debug("DATA of %d Buffer2 = %d", size_b2, set->BufferB2[size_b2]);
     }
+   
 }
 
 #define min(a,b) ((a < b)? a : b)
@@ -784,6 +786,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
   switch (cp->policy) {
   case LRU:
   case FIFO:
+    debug("************************LRU:Tag=%d***********************************",tag);
+    //displayCache(&cp->sets[set]);
     repl = cp->sets[set].way_tail;
     update_way_list(&cp->sets[set], repl, Head);
     break;
@@ -798,7 +802,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
     //Iterate  for (blk = set->way_head; blk; blk = blk->way_next)
     //Pointer  cp->sets[set].p  cp->sets[set].BufferB1[0]
    {
-      debug("************************Tag=%d***********************************",tag);
+      debug("************************ARC:MISS:Tag=%d***********************************",tag);
       displayCache(&cp->sets[set]);
       int in_b1 = 0, in_b2 = 0;
       int size_b1 = 0, size_b2 = 0;
@@ -842,6 +846,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
             } else {
               //Delete LRU in T1
               repl = cp->sets[set].way_tail;
+              debug("Tail item =%d", repl->tag);
               //update_way_list(&cp->sets[set], repl, T1_Head);
             }
         } else { //Case B
@@ -860,6 +865,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
             //debug(" Having empty Cache block No need of eviction");
             repl = cp->sets[set].way_tail;
             // Evict LRU in t1 and place in B1
+             cp->sets[set].T1_size++;
              for (int j=size_b1; ((j >= 0) && size_b1); j--)
           	 {
             	cp->sets[set].BufferB1[j] = cp->sets[set].BufferB1[j-1];
@@ -872,7 +878,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
         //If LRU of T2 needs to be evicted no need to chnage its positions only zize is adjusted
         //If LRU of T1 needs to be evicted we need to update its position to T1 Head 
         if ( repl == cp->sets[set].way_tail) {
-          if(cp->sets[set].T2_size) {
+          if(cp->sets[set].T2_size >=1 ) {
             if(cp->sets[set].T1_size > 1) {
               update_way_list(&cp->sets[set], repl, T1_Head);
             }
@@ -1058,6 +1064,8 @@ debug("Done removing block in hash bucket");
     
    if (cp->policy == ARC)
    {
+     debug("************************ARC:HIT:Tag=%d***********************************",tag);
+     displayCache(&cp->sets[set]);
      //Case 1
      if (blk->way_prev)
     {
@@ -1132,6 +1140,8 @@ debug("Done removing block in hash bucket");
   
    if (cp->policy == ARC)
    {
+     debug("************************ARC:HIT:Tag=%d***********************************",tag);
+     displayCache(&cp->sets[set]);
      //Verify it should be in T2 and move it to MRU
      //Case 1
      if (blk->way_prev)
