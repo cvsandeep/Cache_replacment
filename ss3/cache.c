@@ -269,7 +269,15 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
       //if temp is at tail position should not proceed
       //New element should be inserted at only MRU not at LRU
 
-      assert(temp != set->way_tail);
+      if(temp == set->way_tail)
+      {
+         /* link to the tail of the way list */
+        blk->way_prev = set->way_tail;
+        blk->way_next = NULL;
+        set->way_tail->way_next = blk;
+        set->way_tail = blk;
+        return;
+      }
 
       blk->way_next = temp->way_next;
       blk->way_prev = temp;
@@ -879,7 +887,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
         //If LRU of T1 needs to be evicted we need to update its position to T1 Head 
         if ( repl == cp->sets[set].way_tail) {
           if(cp->sets[set].T2_size >=1 ) {
-            if(cp->sets[set].T1_size > 1) {
+            if(cp->sets[set].T1_size >= 1) {
               update_way_list(&cp->sets[set], repl, T1_Head);
             }
           } else {
